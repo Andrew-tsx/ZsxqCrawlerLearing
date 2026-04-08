@@ -8,64 +8,70 @@
 ## 整体流程概览
 
 ```
-本机构建镜像 → 推送到 Docker Hub → VPS 从 Docker Hub 拉取 → VPS 启动服务
-         ↕                              ↕
-    本机 output/  ──── scp 传输 ────→  VPS output/
+方式 A（推荐）：本机导出镜像 tar 包 ── scp 上传 ──→ VPS 导入镜像 → VPS 启动
+方式 B（备选）：本机推送镜像到 Docker Hub ──────→ VPS 从 Docker Hub 拉取 → VPS 启动
+                                                                  ↕
+                              本机 output/  ──── scp 传输 ────→  VPS output/
 ```
+
+> **方式 A 的优势**：不需要 Docker Hub 账号，不占用公网带宽推送，适合一次性迁移。
+> **方式 B 的优势**：适合需要频繁更新的场景，VPS 上一条命令就能拉取最新镜像。
 
 ---
 
-## 第一步：本机推送镜像到 Docker Hub
+## 方式 A：tar 包导入导出（推荐）
 
-### 1.1 登录 Docker Hub
+### 第一步：本机导出镜像
 
-在本机 PowerShell 执行：
+#### 1.1 重新构建前端（必须）
 
-```powershell
-docker login
-```
-
-输入你的 Docker Hub 用户名和密码。
-
-### 1.2 推送后端镜像
-
-后端镜像之前构建时已经存在本地，只需要打标签并推送：
+前端镜像里写死了后端 API 地址。本机的镜像是 `localhost:8208`，在 VPS 上用不了，必须用 VPS 的公网 IP 重新构建：
 
 ```powershell
-# 把 YOUR_USERNAME 替换成你的 Docker Hub 用户名
-docker tag zsxqcrawlerlearing-backend:latest YOUR_USERNAME/zsxq-backend:latest
-docker push YOUR_USERNAME/zsxq-backend:latest
+# 把 YOUR_VPS_IP 替换成你的 VPS 公网 IP
+docker build -f Dockerfile.frontend --build-arg NEXT_PUBLIC_API_BASE_URL=http://YOUR_VPS_IP:8208 -t zsxq-frontend-vps:latest .
 ```
 
-### 1.3 重新构建并推送前端镜像
+> **为什么前端要重新构建？**
+> Next.js 的 `NEXT_PUBLIC_*` 环境变量在构建时就被写入了 JavaScript 代码。
+> 本机的镜像里写的是 `http://localhost:8208`，到了 VPS 上前端会请求 VPS 自己的 localhost，
+> 而不是后端容器。所以必须用 VPS 的真实地址重新构建一次。
+> 后端不需要重新构建，因为它不关心外部地址。
 
-前端需要在构建时指定后端地址（让前端知道 API 在哪里）：
+#### 1.2 导出镜像为 tar 文件
 
 ```powershell
-# 把 YOUR_USERNAME 和 YOUR_VPS_IP 替换成实际值
-docker build -f Dockerfile.frontend --build-arg NEXT_PUBLIC_API_BASE_URL=http://YOUR_VPS_IP:8208 -t YOUR_USERNAME/zsxq-frontend:latest .
-docker push YOUR_USERNAME/zsxq-frontend:latest
+# 导出后端镜像（约 200MB）
+docker save -o zsxq-backend.tar zsxqcrawlerlearing-backend:latest
+
+# 导出前端镜像（约 1GB）
+docker save -o zsxq-frontend.tar zsxq-frontend-vps:latest
 ```
 
-> **注意**：`NEXT_PUBLIC_API_BASE_URL` 中的地址要填 VPS 的公网 IP。如果后续要绑定域名，这里直接填域名，比如 `http://your-domain.com:8208`。
+导出完成后，当前目录下会有两个 tar 文件。
 
-### 1.4 验证推送成功
+### 第二步：上传到 VPS
 
-登录 https://hub.docker.com/ ，在你的个人页面应该能看到两个仓库：
-- `zsxq-backend`
-- `zsxq-frontend`
+```powershell
+# 上传后端镜像
+scp zsxq-backend.tar your-user@YOUR_VPS_IP:~/
 
----
+# 上传前端镜像
+scp zsxq-frontend.tar your-user@YOUR_VPS_IP:~/
+```
 
-## 第二步：VPS 安装 Docker
+> 两个文件加起来约 1.2GB，上传时间取决于你的上行带宽。
+> 如果速度慢，可以先上传后端（小文件），确认流程跑通后再上传前端。
 
-### 2.1 SSH 连接 VPS
+### 第三步：VPS 安装 Docker
+
+#### 3.1 SSH 连接 VPS
 
 ```powershell
 ssh your-user@YOUR_VPS_IP
 ```
 
-### 2.2 安装 Docker
+#### 3.2 安装 Docker
 
 ```bash
 # 官方一键安装脚本
@@ -78,7 +84,7 @@ sudo usermod -aG docker $USER
 exit
 ```
 
-### 2.3 重新连接并验证
+#### 3.3 重新连接并验证
 
 ```powershell
 ssh your-user@YOUR_VPS_IP
@@ -91,28 +97,47 @@ docker compose version
 
 两个都有版本号输出就说明安装成功。
 
----
+### 第四步：VPS 导入镜像
 
-## 第三步：VPS 创建配置文件
+```bash
+# 导入后端
+docker load -i ~/zsxq-backend.tar
 
-### 3.1 创建项目目录
+# 导入前端
+docker load -i ~/zsxq-frontend.tar
+
+# 验证镜像是否存在
+docker images
+```
+
+应该能看到两个镜像：`zsxqcrawlerlearing-backend` 和 `zsxq-frontend-vps`。
+
+导入完成后可以删除 tar 包释放空间：
+
+```bash
+rm ~/zsxq-backend.tar ~/zsxq-frontend.tar
+```
+
+### 第五步：VPS 创建配置文件并启动
+
+#### 5.1 创建项目目录
 
 ```bash
 mkdir -p ~/zsxq && cd ~/zsxq
 ```
 
-### 3.2 创建 docker-compose 配置
+#### 5.2 创建 docker-compose 配置
 
 ```bash
 nano docker-compose.prod.yml
 ```
 
-粘贴以下内容（替换 3 处占位符）：
+粘贴以下内容（替换 `YOUR_VPS_IP`）：
 
 ```yaml
 services:
   backend:
-    image: YOUR_USERNAME/zsxq-backend:latest
+    image: zsxqcrawlerlearing-backend:latest
     ports:
       - "8208:8208"
     volumes:
@@ -122,7 +147,7 @@ services:
     restart: unless-stopped
 
   frontend:
-    image: YOUR_USERNAME/zsxq-frontend:latest
+    image: zsxq-frontend-vps:latest
     ports:
       - "80:3000"
     environment:
@@ -134,11 +159,11 @@ services:
 
 按 `Ctrl+O` → `Enter` 保存，`Ctrl+X` 退出。
 
-### 3.3 防火墙放行端口
+#### 5.3 防火墙放行端口
 
 **阿里云 ECS 需要两处放行**：
 
-1. **安全组**（阿里云控制台）：
+1. **安全组**（阿里云控制台，必须做）：
    - 登录阿里云控制台 → ECS → 实例 → 安全组 → 添加规则
    - 放行 `80/tcp`（前端）
    - 放行 `8208/tcp`（后端 API）
@@ -151,18 +176,14 @@ sudo ufw allow 8208/tcp
 sudo ufw reload
 ```
 
----
-
-## 第四步：VPS 启动服务
+#### 5.4 启动服务
 
 ```bash
 cd ~/zsxq
 docker compose -f docker-compose.prod.yml up -d
 ```
 
-等待镜像拉取完成（首次约 1-2 分钟）。
-
-### 验证
+#### 5.5 验证
 
 | 检查项 | 命令或地址 |
 |--------|-----------|
@@ -173,13 +194,11 @@ docker compose -f docker-compose.prod.yml up -d
 
 如果三个都正常，VPS 部署就成功了。
 
----
-
-## 第五步：迁移已有数据
+### 第六步：迁移已有数据
 
 如果你在本机已经爬取了数据，想同步到 VPS：
 
-### 5.1 本机打包数据
+#### 6.1 本机打包数据
 
 在本机 PowerShell 执行：
 
@@ -188,13 +207,13 @@ cd D:\4-codes\4-Zsxq\ZsxqCrawlerLearing
 tar czf zsxq-data.tar.gz output/
 ```
 
-### 5.2 上传到 VPS
+#### 6.2 上传到 VPS
 
 ```powershell
 scp zsxq-data.tar.gz your-user@YOUR_VPS_IP:~/zsxq/
 ```
 
-### 5.3 VPS 上解压
+#### 6.3 VPS 上解压
 
 SSH 登录 VPS 后：
 
@@ -208,11 +227,53 @@ docker compose -f docker-compose.prod.yml restart backend
 
 ---
 
-## 第六步：绑定域名和 HTTPS（可选）
+## 方式 B：Docker Hub 中转（备选）
 
-> 前五步完成后再做这一步。
+如果后续需要频繁更新镜像，可以使用 Docker Hub 作为中转。
 
-### 6.1 域名解析
+### B.1 登录 Docker Hub
+
+```powershell
+docker login
+```
+
+### B.2 推送后端
+
+```powershell
+docker tag zsxqcrawlerlearing-backend:latest YOUR_USERNAME/zsxq-backend:latest
+docker push YOUR_USERNAME/zsxq-backend:latest
+```
+
+### B.3 构建并推送前端
+
+```powershell
+docker build -f Dockerfile.frontend --build-arg NEXT_PUBLIC_API_BASE_URL=http://YOUR_VPS_IP:8208 -t YOUR_USERNAME/zsxq-frontend:latest .
+docker push YOUR_USERNAME/zsxq-frontend:latest
+```
+
+### B.4 VPS 上拉取
+
+`docker-compose.prod.yml` 中的 `image` 改为 Docker Hub 上的名称：
+
+```yaml
+image: YOUR_USERNAME/zsxq-backend:latest
+image: YOUR_USERNAME/zsxq-frontend:latest
+```
+
+然后：
+
+```bash
+docker compose -f docker-compose.prod.yml pull
+docker compose -f docker-compose.prod.yml up -d
+```
+
+---
+
+## 第七步：绑定域名和 HTTPS（可选）
+
+> 前面的步骤都跑通后再做这一步。
+
+### 7.1 域名解析
 
 在你的域名服务商（如阿里云万网）添加 DNS 解析记录：
 
@@ -223,14 +284,14 @@ docker compose -f docker-compose.prod.yml restart backend
 
 等待 DNS 生效（通常几分钟，最长 48 小时）。
 
-### 6.2 安装 Nginx 和 Certbot
+### 7.2 安装 Nginx 和 Certbot
 
 ```bash
 sudo apt update
 sudo apt install -y nginx certbot python3-certbot-nginx
 ```
 
-### 6.3 创建 Nginx 配置
+### 7.3 创建 Nginx 配置
 
 ```bash
 sudo nano /etc/nginx/sites-available/zsxq
@@ -266,7 +327,7 @@ server {
 }
 ```
 
-### 6.4 启用配置
+### 7.4 启用配置
 
 ```bash
 sudo ln -s /etc/nginx/sites-available/zsxq /etc/nginx/sites-enabled/
@@ -274,7 +335,7 @@ sudo nginx -t                # 检查配置语法
 sudo systemctl reload nginx  # 重载配置
 ```
 
-### 6.5 申请 HTTPS 证书
+### 7.5 申请 HTTPS 证书
 
 ```bash
 sudo certbot --nginx -d your-domain.com -d www.your-domain.com
@@ -289,11 +350,16 @@ sudo certbot --nginx -d your-domain.com -d www.your-domain.com
 ## VPS 日常管理命令速查
 
 ```bash
+cd ~/zsxq   # 先进入项目目录，以下命令基于此目录
+
 # 查看容器状态
 docker compose -f docker-compose.prod.yml ps
 
 # 查看日志
 docker compose -f docker-compose.prod.yml logs -f
+
+# 只看后端日志
+docker compose -f docker-compose.prod.yml logs -f backend
 
 # 重启服务
 docker compose -f docker-compose.prod.yml restart
@@ -302,10 +368,6 @@ docker compose -f docker-compose.prod.yml restart
 docker compose -f docker-compose.prod.yml down
 
 # 启动服务
-docker compose -f docker-compose.prod.yml up -d
-
-# 更新镜像（本机重新 push 后）
-docker compose -f docker-compose.prod.yml pull
 docker compose -f docker-compose.prod.yml up -d
 ```
 
@@ -338,7 +400,6 @@ SQLite 不支持多进程同时写入。确保 backend 只运行一个实例。
 如果 VPS 部署出问题，随时可以回退到本机运行：
 
 ```powershell
-# 本机启动
 cd D:\4-codes\4-Zsxq\ZsxqCrawlerLearing
 docker compose up -d
 ```
