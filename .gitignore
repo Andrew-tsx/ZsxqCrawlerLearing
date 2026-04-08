@@ -50,3 +50,6 @@ cache
 
 # local config
 config.toml
+
+# docker images
+*.tar
