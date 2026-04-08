@@ -71,16 +71,65 @@ scp zsxq-frontend.tar your-user@YOUR_VPS_IP:~/
 ssh your-user@YOUR_VPS_IP
 ```
 
-#### 3.2 安装 Docker
+#### 3.2 安装 Docker（使用阿里云镜像源）
+
+> 国内 VPS 无法访问 Docker 官方源，需要使用阿里云镜像源安装。
+
+**第一步：添加 Docker GPG 密钥**
+
+GPG 密钥用于验证下载的软件包是否为官方签发，防止被篡改。
 
 ```bash
-# 官方一键安装脚本
-curl -fsSL https://get.docker.com | sh
+curl -fsSL https://mirrors.aliyun.com/docker-ce/linux/ubuntu/gpg | sudo gpg --dearmor -o /usr/share/keyrings/docker-archive-keyring.gpg
+```
 
-# 让当前用户可以使用 docker（免 sudo）
+| 参数 | 含义 |
+|------|------|
+| `curl -fsSL` | `-f` 失败不输出错误页；`-s` 静默；`-S` 配合 `-s` 显示错误；`-L` 跟随重定向 |
+| `gpg --dearmor` | 将文本格式的公钥转为二进制格式（apt 需要） |
+| `-o /usr/share/keyrings/...` | 保存到系统密钥环目录 |
+
+**第二步：添加 Docker apt 软件源**
+
+告诉系统从阿里云地址下载 Docker 软件包，而不是官方地址。
+
+```bash
+echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] https://mirrors.aliyun.com/docker-ce/linux/ubuntu $(. /etc/os-release && echo "$VERSION_CODENAME") stable" | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
+```
+
+| 参数 | 含义 |
+|------|------|
+| `deb` | 二进制软件包源（区别于源码源 `deb-src`） |
+| `arch=$(dpkg --print-architecture)` | 自动检测 CPU 架构（如 `amd64`） |
+| `signed-by=...` | 指定用上一步下载的 GPG 密钥验证此源的包 |
+| `$(. /etc/os-release && echo "$VERSION_CODENAME")` | 自动获取系统版本代号（Ubuntu 24.04 = `noble`） |
+| `stable` | 使用稳定版通道 |
+| `tee /etc/apt/sources.list.d/docker.list` | 写入 apt 软件源配置文件 |
+
+**第三步：更新软件源并安装 Docker**
+
+```bash
+# 更新软件源索引（从刚添加的 Docker 源拉取包列表）
+sudo apt update
+
+# 安装 Docker 及相关组件
+sudo apt install -y docker-ce docker-ce-cli containerd.io docker-compose-plugin
+```
+
+| 包名 | 含义 |
+|------|------|
+| `docker-ce` | Docker 引擎本体（CE = Community Edition 社区免费版） |
+| `docker-ce-cli` | Docker 命令行工具（提供 `docker` 命令） |
+| `containerd.io` | 容器运行时（Docker 底层用它实际运行容器） |
+| `docker-compose-plugin` | Docker Compose 插件（提供 `docker compose` 命令） |
+
+**第四步：配置当前用户权限**
+
+```bash
+# 让当前用户可以使用 docker（免 sudo），需要重新登录生效
 sudo usermod -aG docker $USER
 
-# 退出并重新登录，让权限生效
+# 退出并重新登录
 exit
 ```
 
