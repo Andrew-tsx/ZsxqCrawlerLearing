@@ -2,6 +2,9 @@
 # 第一阶段：构建
 FROM node:20-alpine AS builder
 
+# 声明构建参数：后端 API 地址（构建时通过 --build-arg 传入）
+ARG NEXT_PUBLIC_API_BASE_URL=http://localhost:8208
+
 WORKDIR /app
 
 # 安装依赖
