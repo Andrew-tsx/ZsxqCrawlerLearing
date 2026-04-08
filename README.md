@@ -233,30 +233,8 @@ docker-compose up -d
 
 ## 赞助与支持
 
-如果本项目对你有帮助，欢迎通过以下方式赞助。付款时请在备注中填写"希望公开展示的链接"（如个人主页、GitHub 仓库等），我们会在 README 的"赞助鸣谢"表格中展示。
-
-<div align="center">
-  <table>
-    <tr>
-      <td align="center">
-        <img src="https://github.com/LifeArchiveProject/BilibiliHistoryFetcher/raw/master/public/wechat.png" alt="微信收款码" width="220"><br>
-        微信赞助
-      </td>
-      <td align="center">
-        <img src="https://github.com/LifeArchiveProject/BilibiliHistoryFetcher/raw/master/public/zfb.jpg" alt="支付宝收款码" width="220"><br>
-        支付宝赞助
-      </td>
-    </tr>
-  </table>
-</div>
-
-| 联系内容 | 付款金额 |
-| --------- | -------- |
-| https://github.com/yankai19900930 | ￥28.88 |
-| https://github.com/freejacklee | ￥3 |
-| 匿名用户 | ￥88.88 |
-
-提示：已赞助但未收录，请在 Issues 提交凭证与备注链接；如需匿名可说明。
+如果本项目对你有帮助，请前往支持原作者。
+<https://github.com/2977094657/ZsxqCrawler>
 
 ## 贡献指南
 
