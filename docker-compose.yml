@@ -1,0 +1,33 @@
+services:
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile.backend
+    ports:
+      - "8208:8208"
+    volumes:
+      # 关键：把 output 目录挂载到宿主机，数据不会丢失
+      - ./output:/app/output
+    environment:
+      - OUTPUT_DIR=/app/output
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8208/api/health')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile.frontend
+    ports:
+      - "3060:3000"
+    environment:
+      # 前端通过 Docker 内部网络访问后端
+      # 本机访问用 http://localhost:8208
+      # VPS 部署时改为你的域名或公网 IP
+      - NEXT_PUBLIC_API_BASE_URL=http://localhost:8208
+    depends_on:
+      - backend
+    restart: unless-stopped

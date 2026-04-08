@@ -1,0 +1,27 @@
+# ---- 前端 Dockerfile ----
+# 第一阶段：构建
+FROM node:20-alpine AS builder
+
+WORKDIR /app
+
+# 安装依赖
+COPY frontend/package*.json ./
+RUN npm ci
+
+# 复制源代码并构建
+COPY frontend/ .
+RUN npm run build
+
+# 第二阶段：运行（只保留构建产物，镜像更小）
+FROM node:20-alpine
+
+WORKDIR /app
+COPY --from=builder /app/.next ./.next
+COPY --from=builder /app/node_modules ./node_modules
+COPY --from=builder /app/package.json ./
+COPY --from=builder /app/public ./public
+
+EXPOSE 3000
+
+# 使用生产模式启动（比 dev 模式更快更稳定）
+CMD ["npm", "start"]
