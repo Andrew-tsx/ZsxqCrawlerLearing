@@ -133,6 +133,9 @@ sudo usermod -aG docker $USER
 exit
 ```
 
+> 若不使用阿里云镜像源，可直接用下列命令安装（需要能直接访问到官网）
+`curl -fsSL https://get.docker.com | sh`
+
 #### 3.3 重新连接并验证
 
 ```powershell
