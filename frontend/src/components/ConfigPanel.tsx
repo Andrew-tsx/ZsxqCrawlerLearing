@@ -109,7 +109,7 @@ export default function ConfigPanel({ onConfigSaved }: ConfigPanelProps) {
             <CardContent>
               <Button
                 variant="outline"
-                onClick={() => window.open('http://localhost:8208/docs', '_blank')}
+                onClick={() => window.open((process.env.NEXT_PUBLIC_API_BASE_URL?.trim() || 'http://localhost:8208').replace(/\/$/, '') + '/docs', '_blank')}
                 className="w-full"
               >
                 📖 查看API文档
