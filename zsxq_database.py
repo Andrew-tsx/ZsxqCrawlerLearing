@@ -279,6 +279,10 @@ class ZSXQDatabase:
             # 导入话题内容(talk)
             if 'talk' in topic_data and topic_data['talk']:
                 self._upsert_talk(topic_id, topic_data['talk'])
+
+            # 导入话题内容(solution) - solution类型与talk结构类似，复用talks表存储
+            if 'solution' in topic_data and topic_data['solution']:
+                self._upsert_talk(topic_id, topic_data['solution'])
             
             # 导入文章信息（如果话题类型是文章）
             self._import_articles(topic_id, topic_data)
@@ -313,6 +317,10 @@ class ZSXQDatabase:
             # 导入文件信息
             if 'talk' in topic_data and topic_data['talk'] and 'files' in topic_data['talk']:
                 self._import_files(topic_id, topic_data['talk']['files'])
+
+            # 导入solution中的文件信息
+            if 'solution' in topic_data and topic_data['solution'] and 'files' in topic_data['solution']:
+                self._import_files(topic_id, topic_data['solution']['files'])
 
             return True
             
@@ -559,6 +567,10 @@ class ZSXQDatabase:
         if 'talk' in topic_data and topic_data['talk'] and 'owner' in topic_data['talk']:
             self._upsert_user(topic_data['talk']['owner'])
 
+        # 导入solution中的用户
+        if 'solution' in topic_data and topic_data['solution'] and 'owner' in topic_data['solution']:
+            self._upsert_user(topic_data['solution']['owner'])
+
         # 导入question中的用户
         if 'question' in topic_data and topic_data['question']:
             # 对于非匿名用户，导入提问者信息
@@ -615,11 +627,16 @@ class ZSXQDatabase:
     def _import_images(self, topic_id: int, topic_data: Dict[str, Any]):
         """导入图片信息"""
         images_to_import = []
-        
+
         # 从talk中获取图片
         if 'talk' in topic_data and topic_data['talk'] and 'images' in topic_data['talk']:
             for img in topic_data['talk']['images']:
                 images_to_import.append((img, None))  # (image_data, comment_id)
+
+        # 从solution中获取图片
+        if 'solution' in topic_data and topic_data['solution'] and 'images' in topic_data['solution']:
+            for img in topic_data['solution']['images']:
+                images_to_import.append((img, None))
         
         # 从comments中获取图片
         if 'show_comments' in topic_data:
