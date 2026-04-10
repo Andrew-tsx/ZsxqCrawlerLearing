@@ -60,7 +60,7 @@ gzip, deflate, br, zstd
 accept-language
 zh-CN,zh;q=0.9,en;q=0.8,en-GB;q=0.7,en-US;q=0.6
 cookie
-zsxq_access_token=383F5918-31CD-44B0-B173-BD0C8E9727E5_85487ECE94F2CA08; sensorsdata2015jssdkcross=%7B%22distinct_id%22%3A%22421114288542428%22%2C%22first_id%22%3A%2219d6bd0ba0b28a-028f7c860143a28-4c657b58-2073600-19d6bd0ba0c37%22%2C%22props%22%3A%7B%7D%2C%22identities%22%3A%22eyIkaWRlbnRpdHlfY29va2llX2lkIjoiMTlkNmJkMGJhMGIyOGEtMDI4ZjdjODYwMTQzYTI4LTRjNjU3YjU4LTIwNzM2MDAtMTlkNmJkMGJhMGMzNyIsIiRpZGVudGl0eV9sb2dpbl9pZCI6IjQyMTExNDI4ODU0MjQyOCJ9%22%2C%22history_login_id%22%3A%7B%22name%22%3A%22%24identity_login_id%22%2C%22value%22%3A%22421114288542428%22%7D%7D; abtest_env=product
+xxx
 dnt
 1
 origin
@@ -116,7 +116,7 @@ fetch("https://api.zsxq.com/v2/topics/55522284244482854/comments?sort=asc&count=
     "x-signature": "2d1134810d6eb070a6bd1880034b0a0a48764dc0",
     "x-timestamp": "1775783261",
     "x-version": "2.89.0",
-    "cookie": "zsxq_access_token=383F5918-31CD-44B0-B173-BD0C8E9727E5_85487ECE94F2CA08; sensorsdata2015jssdkcross=%7B%22distinct_id%22%3A%22421114288542428%22%2C%22first_id%22%3A%2219d6bd0ba0b28a-028f7c860143a28-4c657b58-2073600-19d6bd0ba0c37%22%2C%22props%22%3A%7B%7D%2C%22identities%22%3A%22eyIkaWRlbnRpdHlfY29va2llX2lkIjoiMTlkNmJkMGJhMGIyOGEtMDI4ZjdjODYwMTQzYTI4LTRjNjU3YjU4LTIwNzM2MDAtMTlkNmJkMGJhMGMzNyIsIiRpZGVudGl0eV9sb2dpbl9pZCI6IjQyMTExNDI4ODU0MjQyOCJ9%22%2C%22history_login_id%22%3A%7B%22name%22%3A%22%24identity_login_id%22%2C%22value%22%3A%22421114288542428%22%7D%7D; abtest_env=product",
+    "cookie": "xxx",
     "Referer": "https://wx.zsxq.com/"
   },
   "body": null,
