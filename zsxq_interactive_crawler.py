@@ -507,23 +507,26 @@ class ZSXQInteractiveCrawler:
             return time_str
 
     def fetch_topics_safe(self, scope: str = "all", count: int = 20,
-                         end_time: Optional[str] = None, is_historical: bool = False) -> Optional[Dict[str, Any]]:
+                         end_time: Optional[str] = None, begin_time: Optional[str] = None,
+                         is_historical: bool = False) -> Optional[Dict[str, Any]]:
         """安全的话题获取方法"""
-        
+
         # 智能延迟
         self.smart_delay(is_historical)
-        
+
         url = f"{self.base_url}{self.api_endpoint}"
         headers = self.get_stealth_headers()
-        
+
         # 构建参数
         params = {
             "scope": scope,
             "count": str(count)
         }
-        
+
         if end_time:
             params["end_time"] = end_time
+        if begin_time:
+            params["begin_time"] = begin_time
         
         # 不添加额外参数，保持与官网请求一致
         # random_params = {
@@ -542,7 +545,9 @@ class ZSXQInteractiveCrawler:
         
         self.log(f"🌐 安全请求 #{self.request_count}")
         self.log(f"   🎯 参数: scope={scope}, count={count}")
-        if end_time:
+        if begin_time and end_time:
+            self.log(f"   📅 时间窗口: {begin_time} ~ {end_time}")
+        elif end_time:
             self.log(f"   📅 时间: {end_time}")
         self.log(f"   🔗 完整链接: {full_url}")
         

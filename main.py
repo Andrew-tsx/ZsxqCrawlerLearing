@@ -3742,7 +3742,12 @@ def run_crawl_time_range_task(task_id: str, group_id: str, request: "CrawlTimeRa
 
         per_page = request.perPage or 20
         total_stats = {'new_topics': 0, 'updated_topics': 0, 'errors': 0, 'pages': 0}
-        end_time_param = None  # 从最新开始
+
+        # 将 start_dt/end_dt 格式化为 API 参数（ISO8601 +0800 格式）
+        begin_time_param = start_dt.strftime('%Y-%m-%dT%H:%M:%S.%f')[:-3] + '+0800'
+        end_time_param = end_dt.strftime('%Y-%m-%dT%H:%M:%S.%f')[:-3] + '+0800'
+        add_task_log(task_id, f"📡 API时间窗口: begin_time={begin_time_param}, end_time={end_time_param}")
+
         max_retries_per_page = 10
 
         while True:
@@ -3752,7 +3757,6 @@ def run_crawl_time_range_task(task_id: str, group_id: str, request: "CrawlTimeRa
 
             retry = 0
             page_processed = False
-            last_time_dt_in_page = None
 
             while retry < max_retries_per_page:
                 if is_task_stopped(task_id):
@@ -3762,7 +3766,8 @@ def run_crawl_time_range_task(task_id: str, group_id: str, request: "CrawlTimeRa
                     scope="all",
                     count=per_page,
                     end_time=end_time_param,
-                    is_historical=True if end_time_param else False
+                    begin_time=begin_time_param,
+                    is_historical=True
                 )
 
                 # 会员过期
@@ -3783,36 +3788,21 @@ def run_crawl_time_range_task(task_id: str, group_id: str, request: "CrawlTimeRa
                     page_processed = True
                     break
 
-                # 过滤时间范围
-                from datetime import datetime
-                filtered = []
-                for t in topics:
-                    ts = t.get('create_time')
-                    dt = None
-                    try:
-                        if ts:
-                            ts_fixed = ts.replace('+0800', '+08:00') if ts.endswith('+0800') else ts
-                            dt = datetime.fromisoformat(ts_fixed)
-                    except Exception:
-                        dt = None
-
-                    if dt:
-                        last_time_dt_in_page = dt  # 该页数据按时间降序；循环结束后持有最后（最老）时间
-                        if start_dt <= dt <= end_dt:
-                            filtered.append(t)
-
-                # 仅导入时间范围内的数据
-                if filtered:
-                    filtered_data = {'succeeded': True, 'resp_data': {'topics': filtered}}
-                    page_stats = crawler.store_batch_data(filtered_data)
-                    total_stats['new_topics'] += page_stats.get('new_topics', 0)
-                    total_stats['updated_topics'] += page_stats.get('updated_topics', 0)
-                    total_stats['errors'] += page_stats.get('errors', 0)
+                # API 已通过 begin_time/end_time 在服务端过滤，直接全量入库
+                page_stats = crawler.store_batch_data(data)
+                total_stats['new_topics'] += page_stats.get('new_topics', 0)
+                total_stats['updated_topics'] += page_stats.get('updated_topics', 0)
+                total_stats['errors'] += page_stats.get('errors', 0)
 
                 total_stats['pages'] += 1
                 page_processed = True
 
-                # 计算下一页的 end_time（使用该页最老话题时间 - 偏移毫秒）
+                # 如果返回的话题数少于请求数，说明该时间范围内已无更多数据
+                if len(topics) < per_page:
+                    add_task_log(task_id, f"✅ 该时间范围内数据已全部获取（本页{len(topics)}条 < 每页{per_page}条）")
+                    break
+
+                # 计算下一页的 end_time（使用该页最老话题时间 - 偏移毫秒，begin_time 保持不变）
                 oldest_in_page = topics[-1].get('create_time')
                 try:
                     dt_oldest = datetime.fromisoformat(oldest_in_page.replace('+0800', '+08:00'))
@@ -3821,21 +3811,12 @@ def run_crawl_time_range_task(task_id: str, group_id: str, request: "CrawlTimeRa
                 except Exception:
                     end_time_param = oldest_in_page
 
-                # 若该页最老时间已早于 start_dt，则后续更老数据均不在范围内，结束
-                if last_time_dt_in_page and last_time_dt_in_page < start_dt:
-                    add_task_log(task_id, "✅ 已到达起始时间之前，任务结束")
-                    break
-
                 # 成功处理后进行长休眠检查
                 crawler.check_page_long_delay()
                 break  # 成功后跳出重试循环
 
             if not page_processed:
                 add_task_log(task_id, "🚫 当前页面达到最大重试次数，终止任务")
-                break
-
-            # 结束条件：没有下一页时间或已越过起始边界
-            if not end_time_param or (last_time_dt_in_page and last_time_dt_in_page < start_dt):
                 break
 
         update_task(task_id, "completed", "时间区间爬取完成", total_stats)
