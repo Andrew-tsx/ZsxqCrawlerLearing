@@ -3785,8 +3785,8 @@ def run_crawl_time_range_task(task_id: str, group_id: str, request: "CrawlTimeRa
                 topics = (data.get('resp_data', {}) or {}).get('topics', []) or []
                 if not topics:
                     add_task_log(task_id, "📭 无更多数据，任务结束")
-                    page_processed = True
-                    break
+                    update_task(task_id, "completed", "时间区间爬取完成", total_stats)
+                    return
 
                 # API 已通过 begin_time/end_time 在服务端过滤，直接全量入库
                 page_stats = crawler.store_batch_data(data)
@@ -3800,7 +3800,7 @@ def run_crawl_time_range_task(task_id: str, group_id: str, request: "CrawlTimeRa
                 # 如果返回的话题数少于请求数，说明该时间范围内已无更多数据
                 if len(topics) < per_page:
                     add_task_log(task_id, f"✅ 该时间范围内数据已全部获取（本页{len(topics)}条 < 每页{per_page}条）")
-                    break
+                    return  # 直接结束整个任务
 
                 # 计算下一页的 end_time（使用该页最老话题时间 - 偏移毫秒，begin_time 保持不变）
                 oldest_in_page = topics[-1].get('create_time')
