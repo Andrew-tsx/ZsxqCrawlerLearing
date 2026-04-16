@@ -3800,6 +3800,7 @@ def run_crawl_time_range_task(task_id: str, group_id: str, request: "CrawlTimeRa
                 # 如果返回的话题数少于请求数，说明该时间范围内已无更多数据
                 if len(topics) < per_page:
                     add_task_log(task_id, f"✅ 该时间范围内数据已全部获取（本页{len(topics)}条 < 每页{per_page}条）")
+                    update_task(task_id, "completed", "时间区间爬取完成", total_stats)
                     return  # 直接结束整个任务
 
                 # 计算下一页的 end_time（使用该页最老话题时间 - 偏移毫秒，begin_time 保持不变）
